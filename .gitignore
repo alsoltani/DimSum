@@ -41,3 +41,6 @@ Thumbs.db
 src
 .idea
 *.iml
+*.jar
+*.class
+*.txt

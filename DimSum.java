@@ -35,7 +35,7 @@ public class DimSum {
                       Context context) throws IOException, InterruptedException {
 
           // Current row (r_i).
-          String[] r = value.toString().split("\\s");
+          String[] r = value.toString().split("\\t");
 
           for (int j=0; j<r.length; j++){
 
@@ -95,7 +95,7 @@ public class DimSum {
   public static void main(String[] args) throws Exception {
 
       Configuration conf = new Configuration();
-      Job job = Job.getInstance(conf, "Dim Sum Algorithm");
+      Job job = Job.getInstance(conf, "DimSum");
 
       job.setOutputKeyClass(Text.class);
       job.setOutputValueClass(FloatWritable.class);

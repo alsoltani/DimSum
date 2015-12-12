@@ -1,7 +1,6 @@
-package org.apache.hadoop.examples;
-
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
+import java.net.*;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.conf.*;
@@ -11,104 +10,145 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 public class DimSum {
 
-  /**
-   * Mapper class.
-   * -------------
-   * In its original form :
-   * For all pairs (a_ij, a_ik) in row i,
-   * with probability min(1, gamma/(|cj||ck|)),
-   * emit ((cj, ck), a_ij * a_ik).
-   */
+    /**
+     * Mapper class.
+     * -------------
+     * In its original form :
+     * For all pairs (a_ij, a_ik) in row i,
+     * with probability min(1, gamma/(|cj||ck|)),
+     * emit ((cj, ck), a_ij * a_ik).
+     */
 
-  //TODO: Compute sqrt_gamma, list of matrix norms norm_c.
+    public static class Map extends Mapper<LongWritable, Text, Text, DoubleWritable> {
 
-  public static class Map extends Mapper<LongWritable, Text, Text, FloatWritable> {
+        private Text pair = new Text();
+        private DoubleWritable product  = new DoubleWritable();
 
-      private final static FloatWritable one  = new FloatWritable(1);
-      private FloatWritable product  = new FloatWritable();
-      private Text pair = new Text();
+        //TODO: pass similarity_threshold into the DimSum class constructor.
 
-      public void map(LongWritable key, Text value,
-                      Context context) throws IOException, InterruptedException {
+        Double similarity_threshold = 0.1;
 
-          // Current row (r_i).
-          String[] r = value.toString().split("\\t");
+        public void map(LongWritable key, Text value,
+                        Context context) throws IOException, InterruptedException {
 
-          for (int j=0; j<r.length; j++){
+            // Load L2-norms from localhost.
+            // TODO: Use generic filename in Scanner.
+            // ----------------------------
 
-              // Compute probability p_j.
-              float prob_j = Math.min(one, sqrt_gamma / norm_c[j]);
-              Random rand = new Random();
+            List<Double> norm = new ArrayList<Double>();
 
-              if (rand.nextFloat() < prob_j){
+            Path pt = new Path("hdfs://localhost:9000//user/hadoop/l2norm/output/l2-r-00000");
+            FileSystem fs = FileSystem.get(context.getConfiguration());
+            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pt)));
 
-                  for (int k=0; k<r.length; k++){
+            try {
+                String line;
+                line = br.readLine();
+                while (line != null){
 
-                      // Compute probability p_k.
-                      float prob_k = Math.min(one, sqrt_gamma / norm_c[k]);
+                    String[] row = line.split("\\s+");
+                    norm.add(Double.parseDouble(row[1]));
 
-                      if (rand.nextFloat() < prob_k){
+                    // Be sure to read the next line; otherwise you'll get an infinite loop.
+                    line = br.readLine();
+                }
+            } finally {
 
-                          // Convert a_ij = r[j], and a_jk = r[k] to float.
-                          float r_j = Float.parseFloat(r[j]);
-                          float r_k = Float.parseFloat(r[k]);
+                // Close out the BufferedReader.
+                br.close();
+            }
 
-                          product.set(r_j * r_k / (Math.min(sqrt_gamma, c[j]) * Math.min(sqrt_gamma, c[k])));
-                          pair.set(String.valueOf(j) + "\t" + String.valueOf(k));
-                          context.write(pair, product);
-                      }
-                  }
-              }
-          }
-      }
-  }
+            // Actual Mapper implementation
+            // ----------------------------
 
-  /**
-   * Reducer class.
-   * -------------
-   * A reducer class that just emits the sum of the input values.
-   */
+            Double sqrt_gamma = Math.sqrt(4.0 * Math.log(norm.size()) / similarity_threshold);
 
-  public static class Reduce extends Reducer<Text, FloatWritable, Text, FloatWritable> {
+            // Current row (r_i).
 
-    public void reduce(Text key, Iterable<FloatWritable> values, Context context)
-            throws IOException, InterruptedException {
+            String[] r = value.toString().split("\\s+");
 
-        float sum  = 0;
-        for (FloatWritable val : values) {
-            sum += val.get();
+            for (int j=0; j<r.length; j++){
+
+                // Compute probability p_j.
+
+                Double prob_j = Math.min(1.0, sqrt_gamma / norm.get(j));
+                Random rand = new Random();
+
+                if (rand.nextFloat() < prob_j){
+
+                    for (int k=0; k<r.length; k++){
+
+                        // Compute probability p_k.
+
+                        Double prob_k = Math.min(1.0, sqrt_gamma / norm.get(k));
+
+                        if (rand.nextFloat() < prob_k){
+
+                            // Convert a_ij = r[j], and a_jk = r[k] to float.
+
+                            float r_j = Float.parseFloat(r[j]);
+                            float r_k = Float.parseFloat(r[k]);
+
+                            product.set(r_j * r_k /
+                                    (Math.min(sqrt_gamma, norm.get(j)) * Math.min(sqrt_gamma, norm.get(k))));
+                            pair.set(String.valueOf(j) + "_" + String.valueOf(k));
+                            context.write(pair, product);
+                        }
+                    }
+                }
+            }
         }
-        context.write(key, new FloatWritable(sum));
     }
-  }
 
-  /**
-   * The main driver for word count map/reduce program.
-   * Invoke this method to submit the map/reduce job.
-   * @throws IOException When there is communication problems with the
-   * job tracker.
-   */
+    /**
+     * Reducer class.
+     * -------------
+     * A reducer class that just emits the sum of the input values.
+     */
 
-  public static void main(String[] args) throws Exception {
+    public static class Reduce extends Reducer<Text, DoubleWritable, Text, DoubleWritable> {
 
-      Configuration conf = new Configuration();
-      Job job = Job.getInstance(conf, "DimSum");
+        public void reduce(Text key, Iterable<DoubleWritable> values, Context context)
+                throws IOException, InterruptedException {
 
-      job.setOutputKeyClass(Text.class);
-      job.setOutputValueClass(FloatWritable.class);
+            float sum  = 0;
+            for (DoubleWritable val : values) {
+                sum += val.get();
+            }
 
-      job.setMapperClass(Map.class);
-      job.setReducerClass(Reduce.class);
+            context.write(key, new DoubleWritable(sum));
+        }
+    }
 
-      job.setInputFormatClass(TextInputFormat.class);
-      job.setOutputFormatClass(TextOutputFormat.class);
+    /**
+     * The main driver for word count map/reduce program.
+     * Invoke this method to submit the map/reduce job.
+     * @throws IOException When there is communication problems with the
+     * job tracker.
+     */
 
-      FileInputFormat.addInputPath(job, new Path(args[0]));
-      FileOutputFormat.setOutputPath(job, new Path(args[1]));
+    public static void main(String[] args) throws Exception {
 
-      job.waitForCompletion(true);
-  }
+        Configuration conf = new Configuration();
+        Job job = Job.getInstance(conf, "DimSum");
+
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(DoubleWritable.class);
+
+        job.setMapperClass(Map.class);
+        job.setReducerClass(Reduce.class);
+
+        job.setInputFormatClass(TextInputFormat.class);
+        job.setOutputFormatClass(TextOutputFormat.class);
+
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        job.waitForCompletion(true);
+    }
 }

@@ -10,6 +10,8 @@ This relates to the the all-pairs similarity problem : when given a dataset of s
 we aim at finding all similar vector pairs according to a similarity function such as cosine similarity, 
 and a given similarity score threshold.
 
+First compute L2-Norms using `L2Norm.java`, then perform the DimSum algorithm using Hadoop via `DimSum.java`.
+
 ###### Hadoop Cheat Sheet
 
 _Ex. with L2Norm :_

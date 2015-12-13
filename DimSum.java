@@ -18,10 +18,11 @@ public class DimSum {
     /**
      * Mapper class.
      * -------------
-     * In its original form :
-     * For all pairs (a_ij, a_ik) in row i,
-     * with probability min(1, gamma/(|cj||ck|)),
-     * emit ((cj, ck), a_ij * a_ik).
+     * For all a_ij in row i,
+     *  with probability min(1, sqrt(gamma)/|cj|),
+     *      for all a_ik in row i,
+     *          with probability min(1, sqrt(gamma)/|ck|),
+     *              emit ((j, k) => a_ij * a_ik / (min(sqrt(gamma), |cj|) * min(sqrt(gamma), |ck|)).
      */
 
     public static class Map extends Mapper<LongWritable, Text, Text, DoubleWritable> {
@@ -31,7 +32,7 @@ public class DimSum {
 
         //TODO: pass similarity_threshold into the DimSum class constructor.
 
-        Double similarity_threshold = 0.1;
+        Double similarity_threshold = 0.01;
 
         public void map(LongWritable key, Text value,
                         Context context) throws IOException, InterruptedException {
@@ -79,7 +80,7 @@ public class DimSum {
                 Double prob_j = Math.min(1.0, sqrt_gamma / norm.get(j));
                 Random rand = new Random();
 
-                if (rand.nextFloat() < prob_j){
+                if (rand.nextDouble() < prob_j){
 
                     for (int k=0; k<r.length; k++){
 
@@ -87,7 +88,7 @@ public class DimSum {
 
                         Double prob_k = Math.min(1.0, sqrt_gamma / norm.get(k));
 
-                        if (rand.nextFloat() < prob_k){
+                        if (rand.nextDouble() < prob_k){
 
                             // Convert a_ij = r[j], and a_jk = r[k] to float.
 
@@ -116,7 +117,7 @@ public class DimSum {
         public void reduce(Text key, Iterable<DoubleWritable> values, Context context)
                 throws IOException, InterruptedException {
 
-            float sum  = 0;
+            float sum = 0;
             for (DoubleWritable val : values) {
                 sum += val.get();
             }

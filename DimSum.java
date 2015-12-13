@@ -96,7 +96,7 @@ public class DimSum {
 
                             product.set(r_j * r_k /
                                     (Math.min(sqrt_gamma, norm.get(j)) * Math.min(sqrt_gamma, norm.get(k))));
-                            pair.set(String.valueOf(j) + "_" + String.valueOf(k));
+                            pair.set(String.valueOf(j) + "\t" + String.valueOf(k));
                             context.write(pair, product);
                         }
                     }

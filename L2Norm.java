@@ -98,9 +98,8 @@ public class L2Norm {
         // job.setOutputFormatClass(TextOutputFormat.class);
 
         LazyOutputFormat.setOutputFormatClass(job, TextOutputFormat.class);
-        //MultipleOutputs.addNamedOutput(job, "text", TextOutputFormat.class, Text.class, IntWritable.class);
+        MultipleOutputs.addNamedOutput(job, "text", TextOutputFormat.class, Text.class, IntWritable.class);
 
-        MultipleOutputs.addNamedOutput(job, "text", TextOutputFormat.class);
         FileInputFormat.addInputPath(job, new Path(args[0]));
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 

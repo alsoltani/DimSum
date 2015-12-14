@@ -32,7 +32,7 @@ public class DimSum {
 
         //TODO: pass similarity_threshold into the DimSum class constructor.
 
-        Double similarity_threshold = 0.01;
+        Double similarity_threshold = 0.1;
 
         public void map(LongWritable key, Text value,
                         Context context) throws IOException, InterruptedException {
@@ -68,6 +68,7 @@ public class DimSum {
             // ----------------------------
 
             Double sqrt_gamma = Math.sqrt(4.0 * Math.log(norm.size()) / similarity_threshold);
+            Random rand = new Random();
 
             // Current row (r_i).
 
@@ -78,7 +79,6 @@ public class DimSum {
                 // Compute probability p_j.
 
                 Double prob_j = Math.min(1.0, sqrt_gamma / norm.get(j));
-                Random rand = new Random();
 
                 if (rand.nextDouble() < prob_j){
 
@@ -92,8 +92,8 @@ public class DimSum {
 
                             // Convert a_ij = r[j], and a_jk = r[k] to float.
 
-                            float r_j = Float.parseFloat(r[j]);
-                            float r_k = Float.parseFloat(r[k]);
+                            Double r_j = Double.parseDouble(r[j]);
+                            Double r_k = Double.parseDouble(r[k]);
 
                             product.set(r_j * r_k /
                                     (Math.min(sqrt_gamma, norm.get(j)) * Math.min(sqrt_gamma, norm.get(k))));
@@ -117,7 +117,7 @@ public class DimSum {
         public void reduce(Text key, Iterable<DoubleWritable> values, Context context)
                 throws IOException, InterruptedException {
 
-            float sum = 0;
+            Double sum = 0.0;
             for (DoubleWritable val : values) {
                 sum += val.get();
             }

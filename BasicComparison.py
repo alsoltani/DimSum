@@ -4,9 +4,11 @@
 # ----------------------------------------------------
 # A very basic comparison.
 
-
 import numpy as np
 import pandas as pd
+import subprocess
+import random
+from scipy import sparse
 
 
 def cosine_similarities(matrix):
@@ -23,22 +25,39 @@ def cosine_similarities(matrix):
 
 if __name__ == "__main__":
 
-    # Create simple array.
+    # Create the original matrix.
 
-    A = np.random.randint(10, size=(10 ^ 4, 10 ^ 2))
-    np.savetxt("DimSum/A_Matrix.txt", A)
+    """A = sparse.lil_matrix((pow(10, 5), pow(10, 2)))
+    for i in xrange(A.shape[0]):
 
-    # Output DimSum results via MapReduce.
+        values = random.sample(range(A.shape[1]), 2)
+        A[i, values] = np.random.uniform(-1, 1, 2)
 
-    B = pd.read_csv("DimSum/B_Matrix.txt", sep="\t", header=None)
+    np.savetxt("DimSum/A_Matrix.txt", A.todense().astype(np.float16))"""
+
+    # Perform Hadoop job by running bash code.
+    # Do not forget to chmod u+wx DimSum.sh before.
+
+    subprocess.call("bash DimSum/DimSum.sh", shell=True)
+
+    # Load data.
+
+    # A = pd.read_csv("DimSum/A_Matrix.txt", sep=" ", header=None).values
+    A = pd.read_csv("A_Matrix.txt", sep=" ", header=None).values
+    norm_A = np.sqrt(np.sum(A*A, axis=0))
+
+    # Output DimSum results.
+
+    # B = pd.read_csv("DimSum/B_Matrix.txt", sep="\t", header=None)
+    B = pd.read_csv("B_Matrix.txt", sep="\t", header=None)
     B.columns = ["idx", "col", "value"]
     B = B.pivot(index='idx', columns='col', values='value')
-    print B
 
     # Output naive cosine similarities.
 
-    print cosine_similarities(A)
+    cos = cosine_similarities(A)
 
     # Compare the two results.
 
-    print np.linalg.norm(B.values - cosine_similarities(A))
+    error_rate = np.linalg.norm(B.values - cos) / np.linalg.norm(cos)
+    print "Error rate :", error_rate

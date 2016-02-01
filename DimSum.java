@@ -32,14 +32,15 @@ public class DimSum {
 
         //TODO: pass similarity_threshold into the DimSum class constructor.
 
-        Double similarity_threshold = 0.1;
+        Double similarity_threshold = 0.01;
 
         public void map(LongWritable key, Text value,
                         Context context) throws IOException, InterruptedException {
 
             // Load L2-norms from localhost.
-            // TODO: Use generic filename in Scanner.
             // ----------------------------
+            // To run the job locally :      "hdfs://localhost:9000//..."
+            // To run the job on a cluster : "hdfs:/..."
 
             List<Double> norm = new ArrayList<Double>();
 
@@ -119,7 +120,9 @@ public class DimSum {
 
             Double sum = 0.0;
             for (DoubleWritable val : values) {
-                sum += val.get();
+                if (val.get() > 0.0) {
+                    sum += val.get();
+                }
             }
 
             context.write(key, new DoubleWritable(sum));
